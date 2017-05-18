@@ -4,9 +4,16 @@ import collections
 class Accumulator(object):
 
     name = "???"
+    value = NotImplemented
     dependencies = []
 
-    def __init__(self):
+    def __init__(self, name=None, value=None, dependencies=None):
+        if name is not None:
+            self.name = name
+        if value is not None:
+            self.value = value
+        if dependencies is not None:
+            self.dependencies = dependencies
         self._accum_set = None
 
     def __str__(self):
@@ -20,12 +27,8 @@ class Accumulator(object):
             raise ValueError("accumulator is already linked to an accumulator set")
         self._accum_set = accum_set
 
-    def add(self, datum, weight=None):
-        raise NotImplementedError()
-
-    @property
-    def value(self):
-        raise NotImplementedError()
+    def add(self, datum, **kwargs):
+        pass
 
 
 class AccumulatorSet(Accumulator):
@@ -36,17 +39,20 @@ class AccumulatorSet(Accumulator):
         self.attach(*accums)
 
     def attach(self, *accums):
-        to_attach = list(accums)
+        to_attach = collections.deque(accums)
         attached = []
         while len(to_attach) > 0:
-            accum = to_attach.pop()
+            accum = to_attach.popleft()
             if not isinstance(accum, Accumulator) and callable(accum):
                 accum = accum()
             if accum.name not in self._accums:
                 accum.link(self)
                 self._accums[accum.name] = accum
+                deps = accum.dependencies
+                if callable(deps):
+                    deps = deps()
+                to_attach.extend(deps)
                 attached.append(accum)
-                to_attach.extend(accum.dependencies)
         return attached
 
     def get(self, name):
@@ -57,9 +63,9 @@ class AccumulatorSet(Accumulator):
     def __dir__(self):
         return self._accums.keys()
 
-    def add(self, datum, weight=None):
+    def add(self, datum, **kwargs):
         for accum in self._accums.itervalues():
-            accum.add(datum, weight)
+            accum.add(datum, **kwargs)
 
     @property
     def value(self):

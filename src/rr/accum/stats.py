@@ -57,7 +57,7 @@ def _example():
     import random
 
     a = Accumulator.Set(Mean, Min, Max)
-    n = [random.random() for _ in xrange(1000)]
+    n = [random.random() for _ in range(1000)]
     map(a.add, n)
     assert a.min == min(n)
     assert a.max == max(n)

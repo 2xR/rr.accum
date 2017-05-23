@@ -1,3 +1,7 @@
+import collections
+import itertools
+
+
 class Accumulator(object):
 
     name = "???"
@@ -27,57 +31,59 @@ class Accumulator(object):
             raise ValueError("accumulator is already linked to an accumulator set")
         self._accum_set = accum_set
 
-    def add(self, datum, **kwargs):
+    def insert(self, datum, **kwargs):
         pass
 
 
 class AccumulatorSet(Accumulator):
+    """
+    An accumulator set joins together a collection of accumulators, and allows them to use the 
+    services of other accumulators (i.e. their dependencies) to compute their value on demand. 
+    AccumulatorSet subclasses Accumulator to allow for nested accumulator structures. 
+    """
 
     def __init__(self, *accums):
         Accumulator.__init__(self)
-        self._distinct_accums = []
-        self._accums_map = {}
+        self._accums = collections.OrderedDict()
+        self._aliases = {}
         self.attach(*accums)
 
     def attach(self, *accums):
-        accums_list = self._distinct_accums
-        accums_map = self._accums_map
         to_attach = list(accums)
         attached = []
         while len(to_attach) > 0:
             accum = to_attach.pop(0)
             if not isinstance(accum, Accumulator) and callable(accum):
                 accum = accum()
-            if accum.name not in accums_map:
-                accum.link(self)
-                accums_list.append(accum)
-                accums_map[accum.name] = accum
-                aliases = accum.aliases
-                if callable(aliases):
-                    aliases = aliases()
-                for alias in aliases:
-                    if alias not in accums_map:
-                        accums_map[alias] = accum
-
-                deps = accum.dependencies
-                if callable(deps):
-                    deps = deps()
-
-                to_attach.extend(deps)
-                attached.append(accum)
+            if accum.name in self._accums:
+                continue
+            accum.link(self)
+            self._accums[accum.name] = accum
+            aliases = accum.aliases
+            if callable(aliases):
+                aliases = aliases()
+            for alias in itertools.chain([accum.name], aliases):
+                if alias in self._aliases:
+                    raise ValueError("conflicting accumulator alias {!r}".format(alias))
+                self._aliases[alias] = accum
+            deps = accum.dependencies
+            if callable(deps):
+                deps = deps()
+            to_attach.extend(deps)
+            attached.append(accum)
         return attached
 
     def get(self, name):
-        return self._accums[name].value
+        return self._aliases[name].value
 
     __getattr__ = __getitem__ = get
 
     def __dir__(self):
         return self._aliases.keys()
 
-    def add(self, datum, **kwargs):
+    def insert(self, datum, **kwargs):
         for accum in self._accums.itervalues():
-            accum.add(datum, **kwargs)
+            accum.insert(datum, **kwargs)
 
     @property
     def value(self):

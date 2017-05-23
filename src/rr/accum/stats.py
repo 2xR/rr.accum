@@ -67,10 +67,6 @@ def variance(accumulator):
         M2 += delta * delta2
         datum, _ = yield M2 / (n - 1)
 
-    if n < 2:
-        return float('nan')
-    else:
-        return M2 / (n - 1)
 
 class Min(Accumulator):
 

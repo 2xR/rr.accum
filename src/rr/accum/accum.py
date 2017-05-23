@@ -1,23 +1,36 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import collections
+import functools
 import itertools
+
+from future.utils import viewitems, viewvalues
 
 
 class Accumulator(object):
+    """
+    An accumulator represents a quantity/value that is computed from a stream of data, i.e. in an 
+    online fashion. Accumulators can be used standalone, but are typically used through an 
+    accumulator set. See `rr.accum.stats` for examples of accumulators. 
+    """
 
     name = "???"
     aliases = []
-    value = NotImplemented
     dependencies = []
+    value = NotImplemented
 
-    def __init__(self, name=None, aliases=None, value=None, dependencies=None):
+    def __init__(self, name=None, aliases=None, dependencies=None, value=None):
         if name is not None:
             self.name = name
         if aliases is not None:
             self.aliases = aliases
-        if value is not None:
-            self.value = value
         if dependencies is not None:
             self.dependencies = dependencies
+        if value is not None:
+            self.value = value
         self._accum_set = None
 
     def __str__(self):
@@ -35,11 +48,45 @@ class Accumulator(object):
         pass
 
 
+class GeneratorAccumulator(Accumulator):
+    """Wraps a Python generator object, a natural representation for a stream of values."""
+
+    def __init__(self, generator_func, name=None, aliases=None, dependencies=None):
+        Accumulator.__init__(self, name=name, aliases=aliases, dependencies=dependencies)
+        self.generator = generator_func(accumulator=self)  # pass the accumulator to the generator
+        self.value = next(self.generator)  # start the generator
+
+    def insert(self, datum, **kwargs):
+        self.value = self.generator.send((datum, kwargs))
+
+    @classmethod
+    def factory(cls, func=None, name=None, aliases=None, dependencies=None):
+        if func is None:
+            return functools.partial(
+                cls.factory,
+                name=name,
+                aliases=aliases,
+                dependencies=dependencies,
+            )
+        else:
+            @functools.wraps(func)
+            def accum_factory(*args, **kwargs):
+                return cls(
+                    generator_func=functools.partial(func, *args, **kwargs),
+                    name=name or func.__name__,
+                    aliases=aliases,
+                    dependencies=dependencies,
+                )
+            return accum_factory
+
+
 class AccumulatorSet(Accumulator):
     """
     An accumulator set joins together a collection of accumulators, and allows them to use the 
     services of other accumulators (i.e. their dependencies) to compute their value on demand. 
-    AccumulatorSet subclasses Accumulator to allow for nested accumulator structures. 
+    AccumulatorSet subclasses Accumulator to allow for nested accumulator structures.
+     
+    Individual accumulators are accessed either as attributes or keys in the accumulator set.
     """
 
     def __init__(self, *accums):
@@ -82,12 +129,13 @@ class AccumulatorSet(Accumulator):
         return self._aliases.keys()
 
     def insert(self, datum, **kwargs):
-        for accum in self._accums.itervalues():
+        for accum in viewvalues(self._accums):
             accum.insert(datum, **kwargs)
 
     @property
     def value(self):
-        return {name: accum.value for name, accum in self._accums.iteritems()}
+        return {name: accum.value for name, accum in viewitems(self._accums)}
 
 
+Accumulator.Generator = GeneratorAccumulator
 Accumulator.Set = AccumulatorSet

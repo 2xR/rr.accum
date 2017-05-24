@@ -4,7 +4,6 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import collections
-import functools
 import itertools
 
 from future.utils import viewitems, viewvalues
@@ -46,38 +45,6 @@ class Accumulator(object):
 
     def insert(self, datum, **kwargs):
         pass
-
-
-class GeneratorAccumulator(Accumulator):
-    """Wraps a Python generator object, a natural representation for a stream of values."""
-
-    def __init__(self, generator_func, name=None, aliases=None, dependencies=None):
-        Accumulator.__init__(self, name=name, aliases=aliases, dependencies=dependencies)
-        self.generator = generator_func(accumulator=self)  # pass the accumulator to the generator
-        self.value = next(self.generator)  # start the generator
-
-    def insert(self, datum, **kwargs):
-        self.value = self.generator.send((datum, kwargs))
-
-    @classmethod
-    def factory(cls, func=None, name=None, aliases=None, dependencies=None):
-        if func is None:
-            return functools.partial(
-                cls.factory,
-                name=name,
-                aliases=aliases,
-                dependencies=dependencies,
-            )
-        else:
-            @functools.wraps(func)
-            def accum_factory(*args, **kwargs):
-                return cls(
-                    generator_func=functools.partial(func, *args, **kwargs),
-                    name=name or func.__name__,
-                    aliases=aliases,
-                    dependencies=dependencies,
-                )
-            return accum_factory
 
 
 class AccumulatorSet(Accumulator):
@@ -137,5 +104,4 @@ class AccumulatorSet(Accumulator):
         return {name: accum.value for name, accum in viewitems(self._accums)}
 
 
-Accumulator.Generator = GeneratorAccumulator
 Accumulator.Set = AccumulatorSet

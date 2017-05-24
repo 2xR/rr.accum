@@ -11,63 +11,6 @@ INF = float("inf")
 NAN = float("nan")
 
 
-@Accumulator.Generator.factory
-def min(accumulator, initial_value=+INF):
-    value = initial_value
-    while True:
-        datum, _ = yield value
-        if datum < value:
-            value = datum
-
-
-@Accumulator.Generator.factory
-def max(accumulator, initial_value=-INF):
-    value = initial_value
-    while True:
-        datum, _ = yield value
-        if datum > value:
-            value = datum
-
-
-@Accumulator.Generator.factory
-def count(accumulator, initial_value=0):
-    value = initial_value
-    while True:
-        yield value
-        value += 1
-
-
-@Accumulator.Generator.factory
-def sum(accumulator, initial_value=0.0):
-    value = initial_value
-    while True:
-        datum, _ = yield value
-        value += datum
-
-
-@Accumulator.Generator.factory(aliases=["avg", "average"], dependencies=[count, sum])
-def mean(accumulator):
-    accum_set = accumulator._accum_set
-    yield NAN
-    while True:
-        yield accum_set.mean / accum_set.count
-
-
-@Accumulator.Generator.factory(aliases=["var"])
-def variance(accumulator):
-    n = 0
-    mean = 0.0
-    M2 = 0.0
-    datum, _ = yield NAN
-    while True:
-        n += 1
-        delta = datum - mean
-        mean += delta / n
-        delta2 = datum - mean
-        M2 += delta * delta2
-        datum, _ = yield M2 / (n - 1)
-
-
 class Min(Accumulator):
 
     name = "min"
@@ -86,6 +29,18 @@ class Max(Accumulator):
     def insert(self, datum, **kwargs):
         if datum > self.value:
             self.value = datum
+
+
+class Range(Accumulator):
+
+    name = "range"
+    dependencies = [Min, Max]
+    value = NAN
+
+    @property
+    def value(self):
+        accum_set = self._accum_set
+        return accum_set.max - accum_set.min
 
 
 class Count(Accumulator):
@@ -173,7 +128,7 @@ StdDev = StandardDeviation
 def _example():
     import random
 
-    a = Accumulator.Set(Variance, Min, Max)
+    a = Accumulator.Set(StandardDeviation, Mean, Range)
     n = [random.random() for _ in range(1000)]
     for x in n:
         a.insert(x)

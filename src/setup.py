@@ -2,18 +2,14 @@ import re
 
 from setuptools import setup, find_packages
 
-
-with open("README.md", "rt") as readme_file:
+with open("../README.md", "rt") as readme_file:
     readme = readme_file.read()
 
-# Extract version information directly from the source code.
-with open("src/rr/accum/__init__.py", "rt") as source_file:
-    source = source_file.read()
-match = re.search(r"__version__\s*=\s*(['\"])(\d+(\.\d+){2}([-+]?\w+)*)\1", source)
-if match is None:
-    raise Exception("unable to extract version from {}".format(source_file.name))
-version = match.group(2)
-
+with open("rr/accum/__init__.py", "rt") as source_file:
+    version_match = re.search(r"__version__\s*=\s*(['\"])(.*)\1", source_file.read())
+    if version_match is None:
+        raise Exception("unable to extract version from {}".format(source_file.name))
+    version = version_match.group(2)
 
 setup(
     name="rr.accum",
@@ -33,7 +29,6 @@ setup(
         "Programming Language :: Python :: 3.5",
         "Operating System :: OS Independent",
     ],
-    packages=find_packages("src"),
-    package_dir={"": "src"},
+    packages=find_packages(),
     install_requires=["future>=0.16,<0.17"],
 )

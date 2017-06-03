@@ -1,4 +1,3 @@
-from pkgutil import extend_path
+import pkgutil
 
-
-__path__ = extend_path(__path__, __name__)
+__path__ = pkgutil.extend_path(__path__, __name__)

@@ -86,26 +86,19 @@ class Variance(Accumulator):
 
     def __init__(self, name=None, aliases=None):
         Accumulator.__init__(self, name=name, aliases=aliases)
-        self.k = 0
-        self.m_k = NAN
-        self.v_k = NAN
+        self.n = 0
+        self.mu = 0.0
+        self.m2 = 0.0
 
     def insert(self, datum, **kwargs):
-        k0 = self.k
-        if k0 == 0:
-            self.k = 1
-            self.m_k = datum
-            self.v_k = 0.0
-        else:
-            k = k0 + 1
-            m_k0 = self.m_k
-            m_k = m_k0 + (datum - m_k0) / k
-            v_k0 = self.v_k
-            v_k = v_k0 + (datum - m_k0) * (datum - m_k)
-            self.k = k
-            self.m_k = m_k
-            self.v_k = v_k
-            self.value = v_k / k0
+        n = self.n + 1
+        self.n = n
+        delta = datum - self.mu
+        self.mu += delta / n
+        delta2 = datum - self.mu
+        self.m2 += delta * delta2
+        if n > 1:
+            self.value = self.m2 / (n - 1)
 
 
 Var = Variance
@@ -123,18 +116,3 @@ class StandardDeviation(Accumulator):
 
 
 StdDev = StandardDeviation
-
-
-def _example():
-    import random
-
-    a = Accumulator.Set(StandardDeviation, Mean, Range)
-    n = [random.random() for _ in range(1000)]
-    for x in n:
-        a.insert(x)
-    assert a.min == min(n)
-    assert a.max == max(n)
-    assert a.count == len(n)
-    assert a.sum == sum(n)
-    assert a.mean == sum(n) / len(n)
-    return a

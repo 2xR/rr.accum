@@ -11,9 +11,9 @@ from future.utils import viewitems, viewvalues
 
 class Accumulator(object):
     """
-    An accumulator represents a quantity/value that is computed from a stream of data, i.e. in an 
-    online fashion. Accumulators can be used standalone, but are typically used through an 
-    accumulator set. See `rr.accum.stats` for examples of accumulators. 
+    An accumulator represents a quantity/value that is computed from a stream of data, i.e. in an
+    online fashion. Accumulators can be used standalone, but are typically used through an
+    accumulator set. See `rr.accum.stats` for examples of statistical accumulators.
     """
 
     name = "???"
@@ -38,7 +38,7 @@ class Accumulator(object):
     def __repr__(self):
         return "<{} @{:x}>".format(str(self), id(self))
 
-    def link(self, accum_set):
+    def set_parent(self, accum_set):
         if self._accum_set is not None:
             raise ValueError("accumulator is already linked to an accumulator set")
         self._accum_set = accum_set
@@ -49,10 +49,10 @@ class Accumulator(object):
 
 class AccumulatorSet(Accumulator):
     """
-    An accumulator set joins together a collection of accumulators, and allows them to use the 
-    services of other accumulators (i.e. their dependencies) to compute their value on demand. 
+    An accumulator set joins together a collection of accumulators, and allows them to use the
+    services of other accumulators (i.e. their dependencies) to compute their value on demand.
     AccumulatorSet subclasses Accumulator to allow for nested accumulator structures.
-     
+
     Individual accumulators are accessed either as attributes or keys in the accumulator set.
     """
 
@@ -60,10 +60,11 @@ class AccumulatorSet(Accumulator):
         Accumulator.__init__(self)
         self._accums = collections.OrderedDict()
         self._aliases = {}
-        self.attach(*accums)
+        for accum in accums:
+            self.add_child(accum)
 
-    def attach(self, *accums):
-        to_attach = list(accums)
+    def add_child(self, accum):
+        to_attach = [accum]
         attached = []
         while len(to_attach) > 0:
             accum = to_attach.pop(0)
@@ -71,7 +72,7 @@ class AccumulatorSet(Accumulator):
                 accum = accum()
             if accum.name in self._accums:
                 continue
-            accum.link(self)
+            accum.set_parent(self)
             self._accums[accum.name] = accum
             aliases = accum.aliases
             if callable(aliases):
@@ -104,4 +105,6 @@ class AccumulatorSet(Accumulator):
         return {name: accum.value for name, accum in viewitems(self._accums)}
 
 
+# Provide an alias for AccumulatorSet through the Accumulator class. This way users don't have to
+# import the two similarly named classes.
 Accumulator.Set = AccumulatorSet

@@ -1,11 +1,14 @@
+import os.path
 import re
 
 from setuptools import setup, find_packages
 
-with open("../README.md", "rt") as readme_file:
+here = os.path.dirname(__file__)
+
+with open(os.path.join(here, "README.md"), "rt") as readme_file:
     readme = readme_file.read()
 
-with open("rr/accum/__init__.py", "rt") as source_file:
+with open(os.path.join(here, "src/rr/accum/__init__.py"), "rt") as source_file:
     version_match = re.search(r"__version__\s*=\s*(['\"])(.*)\1", source_file.read())
     if version_match is None:
         raise Exception("unable to extract version from {}".format(source_file.name))
@@ -29,6 +32,8 @@ setup(
         "Programming Language :: Python :: 3.5",
         "Operating System :: OS Independent",
     ],
-    packages=find_packages(),
+    packages=find_packages("src"),
+    package_dir={"": "src"},
+    package_data={"": ["LICENSE", "README.md"]},
     install_requires=["future>=0.16,<0.17"],
 )

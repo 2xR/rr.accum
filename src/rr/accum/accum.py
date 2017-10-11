@@ -1,19 +1,11 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-
 import collections
 import itertools
 
-from future.utils import viewitems, viewvalues
 
-
-class Accumulator(object):
-    """
-    An accumulator represents a quantity/value that is computed from a stream of data, i.e. in an
-    online fashion. Accumulators can be used standalone, but are typically used through an
-    accumulator set. See `rr.accum.stats` for examples of statistical accumulators.
+class Accumulator:
+    """An accumulator represents a quantity/value that is computed from a stream of data,
+    i.e. in an online fashion. Accumulators can be used standalone, but are typically used
+    through an accumulator set. See `rr.accum.stats` for examples of statistical accumulators.
     """
 
     name = "???"
@@ -38,18 +30,40 @@ class Accumulator(object):
     def __repr__(self):
         return "<{} @{:x}>".format(str(self), id(self))
 
-    def set_parent(self, accum_set):
+    def link(self, accum_set):
+        """Link this accumulator to a parent accumulator set.
+
+        The parent can be used to obtain the values of this accumulator's dependencies.
+        """
         if self._accum_set is not None:
             raise ValueError("accumulator is already linked to an accumulator set")
         self._accum_set = accum_set
 
-    def insert(self, datum, **kwargs):
+    def observe(self, datum, **kwargs):
         pass
 
 
-class AccumulatorSet(Accumulator):
+class GeneratorBasedAccumulator(Accumulator):
+    """Base class for accumulators that are better described as generators (`.observer()` method).
+
+    Observations are passed to the generator through the `.send()` method as `(datum, kwargs)`
+    pairs, and the generator should yield the updated value of the accumulator.
     """
-    An accumulator set joins together a collection of accumulators, and allows them to use the
+
+    def __init__(self, *args, **kwargs):
+        Accumulator.__init__(self, *args, **kwargs)
+        self._observer = self.observer()  # create the generator object
+        self.value = next(self._observer)  # and start it, receiving the initial value
+
+    def observe(self, datum, **kwargs):
+        self.value = self._observer.send((datum, kwargs))
+
+    def observer(self):
+        raise NotImplementedError()
+
+
+class AccumulatorSet(Accumulator):
+    """An accumulator set joins together a collection of accumulators, and allows them to use the
     services of other accumulators (i.e. their dependencies) to compute their value on demand.
     AccumulatorSet subclasses Accumulator to allow for nested accumulator structures.
 
@@ -61,18 +75,18 @@ class AccumulatorSet(Accumulator):
         self._accums = collections.OrderedDict()
         self._aliases = {}
         for accum in accums:
-            self.add_child(accum)
+            self.add(accum)
 
-    def add_child(self, accum):
-        to_attach = [accum]
-        attached = []
-        while len(to_attach) > 0:
-            accum = to_attach.pop(0)
+    def add(self, accum):
+        queue = collections.deque([accum])
+        added = []
+        while len(queue) > 0:
+            accum = queue.popleft()
             if not isinstance(accum, Accumulator) and callable(accum):
                 accum = accum()
             if accum.name in self._accums:
                 continue
-            accum.set_parent(self)
+            accum.link(self)
             self._accums[accum.name] = accum
             aliases = accum.aliases
             if callable(aliases):
@@ -84,9 +98,9 @@ class AccumulatorSet(Accumulator):
             deps = accum.dependencies
             if callable(deps):
                 deps = deps()
-            to_attach.extend(deps)
-            attached.append(accum)
-        return attached
+            queue.extend(deps)
+            added.append(accum)
+        return added
 
     def get(self, name):
         return self._aliases[name].value
@@ -96,15 +110,19 @@ class AccumulatorSet(Accumulator):
     def __dir__(self):
         return self._aliases.keys()
 
-    def insert(self, datum, **kwargs):
-        for accum in viewvalues(self._accums):
-            accum.insert(datum, **kwargs)
+    def observe(self, datum, **kwargs):
+        for accum in self._accums.values():
+            accum.observe(datum, **kwargs)
 
     @property
     def value(self):
-        return {name: accum.value for name, accum in viewitems(self._accums)}
+        return collections.OrderedDict(
+            (name, accum.value)
+            for name, accum in self._accums.items()
+        )
 
 
-# Provide an alias for AccumulatorSet through the Accumulator class. This way users don't have to
-# import the two similarly named classes.
+# Provide aliases for GeneratorBasedAccumulator and AccumulatorSet through the Accumulator class.
+# This way users don't have to import additional symbols. Less namespace littering ;)
 Accumulator.Set = AccumulatorSet
+Accumulator.GeneratorBased = GeneratorBasedAccumulator

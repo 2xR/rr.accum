@@ -44,6 +44,12 @@ Okay, we are now ready to start pumping numbers into the accumulator set:
 The current value of individual statistics can be obtained either through attribute access or subscripting, by passing the statistic's name or one of its aliases. Some accumulators, like `WeightedStandardDeviation`, have shorter aliases (`wstddev`) for convenience.
 
 
+Compatibility
+=============
+
+Developed and tested in Python 3.6+. The code may or may not work under earlier versions of Python 3 (perhaps back to 3.3).
+
+
 Installation
 ============
 

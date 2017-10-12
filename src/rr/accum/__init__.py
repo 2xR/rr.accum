@@ -1,5 +1,6 @@
 from . import stats
-from .accum import Accumulator, GeneratorBasedAccumulator, AccumulatorSet
+from .accumulator import Accumulator, GeneratorBasedAccumulator
+from .accumulatorset import AccumulatorSet
 
 __version__ = "0.2.0"
 __author__ = "Rui Rei"

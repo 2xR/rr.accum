@@ -1,6 +1,6 @@
 from math import inf, nan, sqrt
 
-from .accum import Accumulator, GeneratorBasedAccumulator
+from .accumulator import Accumulator, GeneratorBasedAccumulator
 
 
 class Min(Accumulator):

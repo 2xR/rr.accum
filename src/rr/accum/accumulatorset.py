@@ -12,53 +12,59 @@ class AccumulatorSet(Accumulator):
     Individual accumulators are accessed either as attributes or keys in the accumulator set.
     """
 
-    def __init__(self, *accums):
-        Accumulator.__init__(self)
-        self._accums = collections.OrderedDict()
-        self._aliases = {}
-        for accum in accums:
-            self.add(accum)
+    def __init__(self, *accums, **kwargs):
+        Accumulator.__init__(self, **kwargs)
+        self._index = {}  # identifier (name/alias) => accumulator map
+        self._accums = []  # list of accumulators belonging to this accumset
+        if len(accums) > 0:
+            self.add(*accums)
 
-    def add(self, accum):
-        queue = collections.deque([accum])
+    def add(self, *accums):
         added = []
+        queue = collections.deque(accums)
+        names = {a.name for a in self._accums}
         while len(queue) > 0:
             accum = queue.popleft()
-            if not isinstance(accum, Accumulator) and callable(accum):
-                accum = accum()
-            if accum.name in self._accums:
+            if not isinstance(accum, Accumulator):
+                accum = resolve(accum)
+            if accum.name in names:
                 continue
+            names.add(accum.name)
             accum.link(self)
-            self._accums[accum.name] = accum
-            aliases = accum.aliases
-            if callable(aliases):
-                aliases = aliases()
-            for alias in itertools.chain([accum.name], aliases):
-                if alias in self._aliases:
-                    raise ValueError("conflicting accumulator alias {!r}".format(alias))
-                self._aliases[alias] = accum
-            deps = accum.dependencies
-            if callable(deps):
-                deps = deps()
-            queue.extend(deps)
+            self._accums.append(accum)
+            for identifier in itertools.chain([accum.name], resolve(accum.aliases)):
+                if identifier in self._index:
+                    raise NameError("duplicate accumulator identifier {!r}".format(identifier))
+                self._index[identifier] = accum
+            queue.extend(resolve(accum.dependencies))
             added.append(accum)
         return added
 
-    def get(self, name):
-        return self._aliases[name].value
+    def get(self, identifier):
+        return self._index[identifier].value
 
     __getattr__ = __getitem__ = get
 
     def __dir__(self):
-        return self._aliases.keys()
+        return self._index.keys()
+
+    def __iter__(self):
+        return iter(self._accums)
+
+    def __len__(self):
+        return len(self._accums)
 
     def observe(self, datum, **kwargs):
-        for accum in self._accums.values():
+        for accum in self._accums:
             accum.observe(datum, **kwargs)
 
     @property
     def value(self):
-        return collections.OrderedDict(
-            (name, accum.value)
-            for name, accum in self._accums.items()
-        )
+        return collections.OrderedDict((a.name, a.value) for a in self._accums)
+
+
+def resolve(x):
+    """Return the result of calling `x` with no arguments if it is a callable, otherwise simply
+    return `x`.
+    """
+    return x() if callable(x) else x

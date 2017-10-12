@@ -10,7 +10,7 @@ This simple library is heavily inspired by the `boost.accumulators library <http
 
 The library builds on two basic concepts:
 
-1. An **accumulator** represents an online computation of some sort, that is assumed to be fairly expensive or to require large amounts of memory. An accumulator observes a stream of data and knows how to update itself incrementally (`Accumulator.observe()` method).
+1. An **accumulator** represents an online computation of some sort, that is assumed to be fairly expensive or require large amounts of memory. An accumulator observes a stream of data and knows how to update itself incrementally (`Accumulator.observe()` method).
 
 2. **Accumulator sets** tie things together and make it easier to use a set of related accumulators. Accumulator sets manage the dependencies of accumulators on other accumulators, and provide an attribute-like interface to access the current values of its constituent accumulators.
 
@@ -20,11 +20,18 @@ Suppose we're interested in observing the mean and variance of a stream of numbe
 
 .. code-block:: python
 
-    from rr.accum import Accumulator, stats
+    from rr.accum import AccumulatorSet, stats
 
-    accums = Accumulator.Set(stats.Mean, stats.Variance)
+    accums = AccumulatorSet(stats.Mean, stats.Variance, name="foo")
+    accums.value  # check initial values
 
-We're now ready to start pumping numbers into the accumulator set:
+We can immediately inspect the initial values, and be surprised to find out that the set includes two statistics that we didn't request: `sum` and `count`. These were added automatically by the accumulator set because the mean depends on the sum and count.
+
+.. warning:: Always list the desired statistics explicitly when creating accumulator sets.
+
+    This not only makes your code clearer, but also guarantees that those statistics will be available. Relying on implicit dependencies may suddenly stop working if a statistic's implementation changes and it stops depending on others.
+
+Okay, we are now ready to start pumping numbers into the accumulator set:
 
 .. code-block:: python
 
@@ -32,9 +39,9 @@ We're now ready to start pumping numbers into the accumulator set:
 
     for _ in range(10000):
         accums.observe(random.random())
-        print("Online mean={} and variance={}".format(accums.mean, accums.variance))
+        print("Online mean={} and variance={}".format(accums.mean, accums["variance"]))
 
-Because of the way accumulator sets work, we've declared that we were interested in mean and variance, and the accumulator set builds a set of necessary accumulators to make sure that those that we've declared are available. In simpler terms, each
+The current value of individual statistics can be obtained either through attribute access or subscripting, by passing the statistic's name or one of its aliases. Some accumulators, like `WeightedStandardDeviation`, have shorter aliases (`wstddev`) for convenience.
 
 
 Installation

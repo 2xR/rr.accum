@@ -65,4 +65,4 @@ License
 
 This library is released as open source under the MIT License.
 
-.. centered:: Copyright (c) 2017 Rui Rei
+Copyright (c) 2017 Rui Rei

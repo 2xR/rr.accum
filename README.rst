@@ -58,3 +58,11 @@ From the github repo:
 .. code-block:: bash
 
     pip install git+https://github.com/2xR/rr.accum.git
+
+
+License
+=======
+
+This library is released as open source under the MIT License.
+
+.. centered:: Copyright (c) 2017 Rui Rei
